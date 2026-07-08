@@ -26,13 +26,32 @@ The final stage formats an audit event for ingestion into enterprise SIEM platfo
 
 ### Hub 1: Revenue Cycle Management
 
-- **Insurance Claim Denial & Appeals Engine** (`src/claims_denial.js`) — Classifies denials by CARC code against a payer policy dictionary, computes the appeal deadline and required-documentation gap, scores financial recovery priority (dollar value, deadline proximity, document readiness), and routes the outcome to a write-off, documentation-gathering, or appeal-submission action.
+- **Insurance Claim Denial & Appeals Engine** (`src/hubs/hub1_revenue_cycle/claims_denial.js`) — Classifies denials by CARC code against a payer policy dictionary, computes the appeal deadline and required-documentation gap, scores financial recovery priority (dollar value, deadline proximity, document readiness), and routes the outcome to a write-off, documentation-gathering, or appeal-submission action.
 
 ### Hub 2: Clinical Operations & Care Coordination
 
-- **Emergency Department Bed Capacity Predictor** (`src/predictor.js`) — Scores ED admission risk from ESI triage acuity, vital-sign abnormalities, age bucket, and complaint category, then pre-allocates a recommended unit (ICU / Med-Surg-Telemetry / Observation) via an automated bed-reservation RPA payload.
-- **Automated Electronic Prior Authorization (ePA) Coordinator** (`src/prior_auth.js`) — Extracts requested procedure, treatment history, and diagnosis from unstructured clinical notes, checks them against a dynamic medical policy dictionary (required conservative treatment + duration), and either formulates a FHIR prior-auth `Claim` or blocks submission with a specific, action-oriented documentation request to clinic staff.
-- **Hospital Discharge & Post-Care Handoff Orchestrator** (`src/discharge_orchestrator.js`) — Parses a multi-line discharge summary into medications, follow-up timelines, and activity restrictions; validates medication completeness and pharmacy fulfillment capability; and dispatches synchronized plain-language patient instructions, an e-prescribing payload, and a 48-hour follow-up telehealth scheduling request.
+- **Emergency Department Bed Capacity Predictor** (`src/hubs/hub2_clinical_operations/predictor.js`) — Scores ED admission risk from ESI triage acuity, vital-sign abnormalities, age bucket, and complaint category, then pre-allocates a recommended unit (ICU / Med-Surg-Telemetry / Observation) via an automated bed-reservation RPA payload.
+- **Automated Electronic Prior Authorization (ePA) Coordinator** (`src/hubs/hub2_clinical_operations/prior_auth.js`) — Extracts requested procedure, treatment history, and diagnosis from unstructured clinical notes, checks them against a dynamic medical policy dictionary (required conservative treatment + duration), and either formulates a FHIR prior-auth `Claim` or blocks submission with a specific, action-oriented documentation request to clinic staff.
+- **Hospital Discharge & Post-Care Handoff Orchestrator** (`src/hubs/hub2_clinical_operations/discharge_orchestrator.js`) — Parses a multi-line discharge summary into medications, follow-up timelines, and activity restrictions; validates medication completeness and pharmacy fulfillment capability; and dispatches synchronized plain-language patient instructions, an e-prescribing payload, and a 48-hour follow-up telehealth scheduling request.
+- **Automated Medication Reconciliation & Drug-Interaction Sentinel** (`src/hubs/hub2_clinical_operations/med_reconciliation.js`) — Cross-references home medications against new hospital orders using a clinical risk dictionary, blocking reconciliation and alerting the attending physician on any high-risk interaction (e.g., Warfarin + NSAIDs), or committing a unified FHIR `MedicationRequest` bundle when clear.
+
+## 📁 Repository Layout & Contribution Standards
+
+```
+src/
+└── hubs/
+    ├── hub1_revenue_cycle/
+    │   └── claims_denial.js
+    └── hub2_clinical_operations/
+        ├── predictor.js
+        ├── prior_auth.js
+        ├── discharge_orchestrator.js
+        └── med_reconciliation.js
+```
+
+Every agent module lives inside its designated operational hub directory under `src/hubs/` — never as a flat file directly in `src/`. Hub directories group agents by business domain (revenue cycle, clinical operations, and any future hub), keeping the module count per directory legible as the framework grows.
+
+⚠️ **MANDATORY DIRECTORY POLICY:** All future AI agent modules added to this framework must be sequentially numbered and mandatorily deployed inside their designated operational hub directory. Flat file additions to the root `src/` folder are strictly prohibited to maintain architectural integrity.
 
 ## Production & Compliance Considerations
 
