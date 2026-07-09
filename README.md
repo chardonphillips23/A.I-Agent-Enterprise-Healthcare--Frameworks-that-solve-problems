@@ -43,6 +43,14 @@ The final stage formats an audit event for ingestion into enterprise SIEM platfo
 - **Cold-Chain IoT Sentinel** (`src/hubs/hub3_pharmacy_logistics/cold_chain_iot_sentinel.js`) — Parses refrigerator telemetry for biologic storage (insulin, mRNA vaccines), flags a spoilage incident if the reading falls outside the strict 2°C–8°C safe-storage window, and on excursion emits both a stock-redistribution routing payload and an urgent facilities work ticket.
 - **Compounding Allergy Auditor** (`src/hubs/hub3_pharmacy_logistics/compounding_allergy_auditor.js`) — Cross-references IV compounding chemical components against a patient's allergy profile (normalizing plural/singular mismatches, e.g. "Penicillin" vs. "Penicillins"), hard-blocking the compound and alerting the cleanroom lab tech on any anaphylactic cross-reactivity risk.
 
+### Hub 4: Veterinary Practice Management & Animal Health Networks
+
+- **Companion Toxicosis Sentinel** (`src/hubs/hub4_veterinary_operations/companion_toxicosis_sentinel.js`) — Screens ingested-substance emergencies (chocolate, xylitol, grapes for canines; lilies, acetaminophen for felines) against a species-specific, weight-scaled toxic-dose ratio; always posts a PIMS whiteboard triage entry, and on a ratio at or above the lethal-dose-equivalent threshold, triggers a STAT decontamination alert.
+- **Equine Telemetry MEWS** (`src/hubs/hub4_veterinary_operations/equine_telemetry_mews.js`) — Computes an Equine Early Warning Score (EEWS) from stall IoT vitals, weighted so that heart rate above 60 bpm or capillary refill time above 2 seconds can trip a critical colic-crisis alert on its own; always emits a PIMS dashboard vitals string, and pages the on-call large-animal field surgeon when EEWS reaches 5 or higher.
+- **Avian/Exotic Dosage Guard** (`src/hubs/hub4_veterinary_operations/avian_exotic_dosage_guard.js`) — Applies a strict micrograms-per-gram safety ceiling for sub-1000g (avian/reptilian) patients, failing closed to a pharmacist intercept if the requested dose exceeds the ceiling or if no ceiling is on file for the drug, otherwise clearing a cleanroom compounding label.
+- **Shelter Intake Quarantine Router** (`src/hubs/hub4_veterinary_operations/shelter_intake_quarantine_router.js`) — Cross-references intake symptoms against a contagious-disease matrix (canine parvovirus, feline leukemia, feline panleukopenia, rabies vector); high-risk matches are hard-routed to isolation housing with a biohazard cleaning ticket, with an explicit guard that refuses to let a positive match reach general-population housing.
+- **Livestock Biosecurity Anomaly Detector** (`src/hubs/hub4_veterinary_operations/livestock_biosecurity_anomaly_detector.js`) — Flags a state-level biosecurity outbreak when 24-hour mortality spikes past 300% or water consumption drops sharply for a sector; on detection, hard-blocks standard transport logging, issues a corporate logistics hold, and formulates the mandatory USDA/State Veterinarian notification report.
+
 ## 📁 Repository Layout & Contribution Standards
 
 ```
@@ -57,10 +65,16 @@ src/
     │   ├── med_reconciliation.js
     │   ├── icu_acuity_sentinel.js
     │   └── telehealth_triage_router.js
-    └── hub3_pharmacy_logistics/
-        ├── substance_compliance_guard.js
-        ├── cold_chain_iot_sentinel.js
-        └── compounding_allergy_auditor.js
+    ├── hub3_pharmacy_logistics/
+    │   ├── substance_compliance_guard.js
+    │   ├── cold_chain_iot_sentinel.js
+    │   └── compounding_allergy_auditor.js
+    └── hub4_veterinary_operations/
+        ├── companion_toxicosis_sentinel.js
+        ├── equine_telemetry_mews.js
+        ├── avian_exotic_dosage_guard.js
+        ├── shelter_intake_quarantine_router.js
+        └── livestock_biosecurity_anomaly_detector.js
 ```
 
 Every agent module lives inside its designated operational hub directory under `src/hubs/` — never as a flat file directly in `src/`. Hub directories group agents by business domain (revenue cycle, clinical operations, and any future hub), keeping the module count per directory legible as the framework grows.
@@ -76,3 +90,4 @@ This framework, as implemented, represents the **code-level architecture layer**
 - **Encryption in transit and at rest:** TLS for all inter-service calls (EHR, RPA orchestrator, SIEM) and encryption at rest for any datastore the pipeline touches.
 - **Business Associate Agreements (BAAs):** with every third-party vendor in the data path (RPA platform, SIEM provider, cloud host) before any real PHI flows through these integrations.
 - **Clinical and regulatory validation:** the risk-scoring and policy-matching logic in Hub 2 modules are illustrative rule engines, not clinically validated predictive models — real deployment against real admission/authorization decisions requires clinical review and, depending on use, regulatory clearance.
+- **Hub 4 regulatory scope note:** HIPAA governs human PHI and does not apply to animal patient data — the owner/pet-name hashing pattern in Hub 4 is carried over as a data-privacy best practice for consistency, not a HIPAA obligation. Hub 4's actual regulatory surface is different (state veterinary boards, DEA rules for controlled substances in animals, and USDA/APHIS reportable-disease requirements for the livestock biosecurity module) and needs its own compliance review before production use.

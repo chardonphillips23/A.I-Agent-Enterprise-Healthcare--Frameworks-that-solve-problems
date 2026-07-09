@@ -10,6 +10,11 @@ const { TelehealthTriageRouter } = require('./hubs/hub2_clinical_operations/tele
 const { SubstanceComplianceGuard } = require('./hubs/hub3_pharmacy_logistics/substance_compliance_guard');
 const { ColdChainIotSentinel } = require('./hubs/hub3_pharmacy_logistics/cold_chain_iot_sentinel');
 const { CompoundingAllergyAuditor } = require('./hubs/hub3_pharmacy_logistics/compounding_allergy_auditor');
+const { CompanionToxicosisSentinel } = require('./hubs/hub4_veterinary_operations/companion_toxicosis_sentinel');
+const { EquineTelemetryMews } = require('./hubs/hub4_veterinary_operations/equine_telemetry_mews');
+const { AvianExoticDosageGuard } = require('./hubs/hub4_veterinary_operations/avian_exotic_dosage_guard');
+const { ShelterIntakeQuarantineRouter } = require('./hubs/hub4_veterinary_operations/shelter_intake_quarantine_router');
+const { LivestockBiosecurityAnomalyDetector } = require('./hubs/hub4_veterinary_operations/livestock_biosecurity_anomaly_detector');
 
 function printBanner(title) {
   const rule = '='.repeat(70);
@@ -234,6 +239,101 @@ function runCompoundingAllergyAuditorDemo() {
   );
 }
 
+function runCompanionToxicosisSentinelDemo() {
+  printBanner('RUNNING AGENT 11: COMPANION TOXICOSIS SENTINEL (Hub 4)');
+  const engine = new CompanionToxicosisSentinel();
+  const rawText = [
+    'Owner: Maria Gomez',
+    'Pet Name: Buddy',
+    'Species: Canine',
+    'Breed: Labrador Retriever',
+    'Age: 4',
+    'Weight (kg): 28',
+    'Ingested Substance: Baking Chocolate',
+    'Estimated Ingested Grams: 200',
+  ].join('\n');
+
+  printResult('Stage 1 Output (Signalment Record)', engine.ingest(rawText));
+  printResult(
+    'Full Run Output (expected: toxic ratio >= 1, STAT decontamination alert)',
+    engine.run(rawText)
+  );
+}
+
+function runEquineTelemetryMewsDemo() {
+  printBanner('RUNNING AGENT 12: EQUINE TELEMETRY MEWS (Hub 4)');
+  const engine = new EquineTelemetryMews();
+  const rawTelemetry = {
+    horseId: 'HORSE-04521',
+    heartRate: 68, // >60bpm: colic/shock indicator
+    respirationRate: 28,
+    temperatureCelsius: 38.9,
+    capillaryRefillTime: 3, // >2s: poor perfusion
+  };
+
+  printResult('Stage 1 Output (Redacted Vitals Record)', engine.ingest(rawTelemetry));
+  printResult(
+    'Full Run Output (expected: EEWS >= 5, field surgeon paged)',
+    engine.run(rawTelemetry)
+  );
+}
+
+function runAvianExoticDosageGuardDemo() {
+  printBanner('RUNNING AGENT 13: AVIAN/EXOTIC DOSAGE GUARD (Hub 4)');
+  const engine = new AvianExoticDosageGuard();
+  const rawRequest = {
+    species: 'African Grey Parrot',
+    weightGrams: 450,
+    drugName: 'Meloxicam',
+    requestedDosageMg: 0.5, // far exceeds the 0.2 mcg/g ceiling at this body weight
+  };
+  const patientIdentifiers = { ownerName: 'Diane Carter', petName: 'Kiwi' };
+
+  printResult('Stage 1 Output (Rx Record)', engine.ingest(rawRequest, patientIdentifiers));
+  printResult(
+    'Full Run Output (expected: blocked, micro-dosing intercept)',
+    engine.run(rawRequest, patientIdentifiers)
+  );
+}
+
+function runShelterIntakeQuarantineRouterDemo() {
+  printBanner('RUNNING AGENT 14: SHELTER INTAKE QUARANTINE ROUTER (Hub 4)');
+  const engine = new ShelterIntakeQuarantineRouter();
+  const intakeRecord = {
+    strayId: 'STRAY-7788',
+    species: 'Canine',
+    symptoms: ['bloody diarrhea', 'vomiting', 'lethargy'],
+  };
+  const requestHeaders = { authorization: 'Bearer mock-oauth2-bearer-token-abcdef123456' };
+
+  printResult('Stage 1 Output (Intake Record)', engine.ingest(intakeRecord));
+  printResult(
+    'Full Run Output (expected: parvovirus match, isolation ward + biohazard ticket)',
+    engine.run(intakeRecord, requestHeaders)
+  );
+}
+
+function runLivestockBiosecurityAnomalyDetectorDemo() {
+  printBanner('RUNNING AGENT 15: LIVESTOCK BIOSECURITY ANOMALY DETECTOR (Hub 4)');
+  const engine = new LivestockBiosecurityAnomalyDetector();
+  const rawMetrics = {
+    sectorCode: 'SECTOR-14',
+    species: 'poultry_broiler',
+    flockCount: 50000,
+    previousDayMortality: 45,
+    currentDayMortality: 210, // +366%: mortality spike
+    previousDayWaterConsumptionLiters: 12000,
+    currentDayWaterConsumptionLiters: 7000, // -42%: sharp water drop
+    feedConsumptionKg: 4800,
+  };
+
+  printResult('Stage 1 Output (Production Metrics Record)', engine.ingest(rawMetrics));
+  printResult(
+    'Full Run Output (expected: outbreak detected, USDA report + logistics hold)',
+    engine.run(rawMetrics)
+  );
+}
+
 function main() {
   runClaimsDenialDemo();
   runEdPredictorDemo();
@@ -246,8 +346,13 @@ function main() {
   runSubstanceComplianceGuardDemo();
   runColdChainIotSentinelDemo();
   runCompoundingAllergyAuditorDemo();
+  runCompanionToxicosisSentinelDemo();
+  runEquineTelemetryMewsDemo();
+  runAvianExoticDosageGuardDemo();
+  runShelterIntakeQuarantineRouterDemo();
+  runLivestockBiosecurityAnomalyDetectorDemo();
 
-  printBanner('DEMO SEQUENCE COMPLETE — 11 RUNS ACROSS 10 AGENTS');
+  printBanner('DEMO SEQUENCE COMPLETE — 16 RUNS ACROSS 15 AGENTS');
 }
 
 main();
