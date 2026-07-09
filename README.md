@@ -34,6 +34,14 @@ The final stage formats an audit event for ingestion into enterprise SIEM platfo
 - **Automated Electronic Prior Authorization (ePA) Coordinator** (`src/hubs/hub2_clinical_operations/prior_auth.js`) — Extracts requested procedure, treatment history, and diagnosis from unstructured clinical notes, checks them against a dynamic medical policy dictionary (required conservative treatment + duration), and either formulates a FHIR prior-auth `Claim` or blocks submission with a specific, action-oriented documentation request to clinic staff.
 - **Hospital Discharge & Post-Care Handoff Orchestrator** (`src/hubs/hub2_clinical_operations/discharge_orchestrator.js`) — Parses a multi-line discharge summary into medications, follow-up timelines, and activity restrictions; validates medication completeness and pharmacy fulfillment capability; and dispatches synchronized plain-language patient instructions, an e-prescribing payload, and a 48-hour follow-up telehealth scheduling request.
 - **Automated Medication Reconciliation & Drug-Interaction Sentinel** (`src/hubs/hub2_clinical_operations/med_reconciliation.js`) — Cross-references home medications against new hospital orders using a clinical risk dictionary, blocking reconciliation and alerting the attending physician on any high-risk interaction (e.g., Warfarin + NSAIDs), or committing a unified FHIR `MedicationRequest` bundle when clear.
+- **ICU Acuity Sentinel** (`src/hubs/hub2_clinical_operations/icu_acuity_sentinel.js`) — Computes a Modified Early Warning Score (MEWS) from respiration rate, heart rate, systolic BP, and temperature; always emits an HL7 v2 `ORU^R01` telemetry message for continuous monitoring, and additionally pages the attending physician STAT when MEWS reaches 5 or higher.
+- **Telehealth Triage Router** (`src/hubs/hub2_clinical_operations/telehealth_triage_router.js`) — Scans telehealth chat text for acute-risk keywords (chest pain, stroke symptoms, suicidal ideation, respiratory distress), classifies a triage level, and routes critical/urgent cases to an instant WebRTC or Twilio escalation link; routine sessions get no escalation payload.
+
+### Hub 3: Pharmacy Logistics & Supply Chain
+
+- **Substance Compliance Guard** (`src/hubs/hub3_pharmacy_logistics/substance_compliance_guard.js`) — Checks Schedule II refill requests against a mock state PDMP database; blocks and issues a DEA audit exception if less than 85% of the prior fill's days-supply has elapsed, otherwise clears a FHIR `MedicationRequest` carrying mock provenance-compliance extensions.
+- **Cold-Chain IoT Sentinel** (`src/hubs/hub3_pharmacy_logistics/cold_chain_iot_sentinel.js`) — Parses refrigerator telemetry for biologic storage (insulin, mRNA vaccines), flags a spoilage incident if the reading falls outside the strict 2°C–8°C safe-storage window, and on excursion emits both a stock-redistribution routing payload and an urgent facilities work ticket.
+- **Compounding Allergy Auditor** (`src/hubs/hub3_pharmacy_logistics/compounding_allergy_auditor.js`) — Cross-references IV compounding chemical components against a patient's allergy profile (normalizing plural/singular mismatches, e.g. "Penicillin" vs. "Penicillins"), hard-blocking the compound and alerting the cleanroom lab tech on any anaphylactic cross-reactivity risk.
 
 ## 📁 Repository Layout & Contribution Standards
 
@@ -42,11 +50,17 @@ src/
 └── hubs/
     ├── hub1_revenue_cycle/
     │   └── claims_denial.js
-    └── hub2_clinical_operations/
-        ├── predictor.js
-        ├── prior_auth.js
-        ├── discharge_orchestrator.js
-        └── med_reconciliation.js
+    ├── hub2_clinical_operations/
+    │   ├── predictor.js
+    │   ├── prior_auth.js
+    │   ├── discharge_orchestrator.js
+    │   ├── med_reconciliation.js
+    │   ├── icu_acuity_sentinel.js
+    │   └── telehealth_triage_router.js
+    └── hub3_pharmacy_logistics/
+        ├── substance_compliance_guard.js
+        ├── cold_chain_iot_sentinel.js
+        └── compounding_allergy_auditor.js
 ```
 
 Every agent module lives inside its designated operational hub directory under `src/hubs/` — never as a flat file directly in `src/`. Hub directories group agents by business domain (revenue cycle, clinical operations, and any future hub), keeping the module count per directory legible as the framework grows.

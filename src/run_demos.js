@@ -5,6 +5,11 @@ const { EdBedCapacityPredictor } = require('./hubs/hub2_clinical_operations/pred
 const { PriorAuthCoordinator } = require('./hubs/hub2_clinical_operations/prior_auth');
 const { DischargeOrchestrator } = require('./hubs/hub2_clinical_operations/discharge_orchestrator');
 const { MedReconciliationSentinel } = require('./hubs/hub2_clinical_operations/med_reconciliation');
+const { IcuAcuitySentinel } = require('./hubs/hub2_clinical_operations/icu_acuity_sentinel');
+const { TelehealthTriageRouter } = require('./hubs/hub2_clinical_operations/telehealth_triage_router');
+const { SubstanceComplianceGuard } = require('./hubs/hub3_pharmacy_logistics/substance_compliance_guard');
+const { ColdChainIotSentinel } = require('./hubs/hub3_pharmacy_logistics/cold_chain_iot_sentinel');
+const { CompoundingAllergyAuditor } = require('./hubs/hub3_pharmacy_logistics/compounding_allergy_auditor');
 
 function printBanner(title) {
   const rule = '='.repeat(70);
@@ -137,6 +142,98 @@ function runMedReconciliationDemo() {
   );
 }
 
+function runIcuAcuitySentinelDemo() {
+  printBanner('RUNNING AGENT 6: ICU ACUITY SENTINEL (Hub 2)');
+  const engine = new IcuAcuitySentinel();
+  const rawVitals = {
+    mrn: 'MRN-445566',
+    dob: '1947-08-03',
+    respirationRate: 32, // >=30: critical
+    heartRate: 135, // >=130: critical
+    systolicBP: 78, // 71-80: hypotensive
+    temperatureCelsius: 39.2, // >=38.5: febrile
+  };
+
+  printResult('Stage 1 Output (Redacted Vitals Record)', engine.ingest(rawVitals));
+  printResult(
+    'Full Run Output (expected: MEWS >= 5, STAT physician page)',
+    engine.run(rawVitals)
+  );
+}
+
+function runTelehealthTriageRouterDemo() {
+  printBanner('RUNNING AGENT 7: TELEHEALTH TRIAGE ROUTER (Hub 2)');
+  const engine = new TelehealthTriageRouter();
+  const chatText = 'I have been having chest pain and shortness of breath for the last hour, it is getting worse.';
+  const patientIdentifiers = { mrn: 'MRN-221199', dob: '1980-04-22' };
+  const messagingMetadata = { messageCount: 4, sessionDurationSeconds: 180 };
+  const requestHeaders = { authorization: 'Bearer mock-oauth2-bearer-token-abcdef123456' };
+
+  printResult(
+    'Stage 1 Output (Detected Flags Record)',
+    engine.ingest(chatText, patientIdentifiers, messagingMetadata)
+  );
+  printResult(
+    'Full Run Output (expected: critical triage, WebRTC escalation)',
+    engine.run(chatText, patientIdentifiers, messagingMetadata, requestHeaders)
+  );
+}
+
+function runSubstanceComplianceGuardDemo() {
+  printBanner('RUNNING AGENT 8: SUBSTANCE COMPLIANCE GUARD (Hub 3)');
+  const engine = new SubstanceComplianceGuard();
+  // MRN-990211 is seeded in the mock PDMP database with a 30-day Oxycodone
+  // supply filled 2026-06-20 — requesting a refill on 2026-07-09 is only
+  // ~63% through that supply, well under the 85% DEA/PDMP threshold.
+  const rawRequest = {
+    drugName: 'Oxycodone',
+    dosage: '10mg',
+    daysSupply: 30,
+    requestedFillDate: '2026-07-09',
+  };
+  const patientIdentifiers = { mrn: 'MRN-990211', dob: '1975-01-01' };
+
+  printResult('Stage 1 Output (Rx Record + PDMP Lookup)', engine.ingest(rawRequest, patientIdentifiers));
+  printResult(
+    'Full Run Output (expected: blocked, DEA audit exception)',
+    engine.run(rawRequest, patientIdentifiers)
+  );
+}
+
+function runColdChainIotSentinelDemo() {
+  printBanner('RUNNING AGENT 9: COLD-CHAIN IOT SENTINEL (Hub 3)');
+  const engine = new ColdChainIotSentinel();
+  const telemetryText = [
+    'Unit: FRIDGE-7',
+    'Product: Insulin Glargine',
+    'Temperature: 9.4C',
+    'Timestamp: 2026-07-09T02:15:00Z',
+  ].join('\n');
+
+  printResult('Stage 1 Output (Redacted Telemetry Record)', engine.ingest(telemetryText));
+  printResult(
+    'Full Run Output (expected: warming excursion, redistribution + facilities ticket)',
+    engine.run(telemetryText)
+  );
+}
+
+function runCompoundingAllergyAuditorDemo() {
+  printBanner('RUNNING AGENT 10: COMPOUNDING ALLERGY AUDITOR (Hub 3)');
+  const engine = new CompoundingAllergyAuditor();
+  const formulaText = 'Normal Saline 500mL + Penicillin G 2000000 units + Dextrose 5%';
+  const allergyProfile = ['Penicillins', 'Latex'];
+  const patientIdentifiers = { mrn: 'MRN-334455', dob: '1990-09-09' };
+
+  printResult(
+    'Stage 1 Output (Components + Allergy Profile Record)',
+    engine.ingest(formulaText, allergyProfile, patientIdentifiers)
+  );
+  printResult(
+    'Full Run Output (expected: hard-blocked, cleanroom intercept)',
+    engine.run(formulaText, allergyProfile, patientIdentifiers)
+  );
+}
+
 function main() {
   runClaimsDenialDemo();
   runEdPredictorDemo();
@@ -144,8 +241,13 @@ function main() {
   runPriorAuthPassDemo();
   runDischargeOrchestratorDemo();
   runMedReconciliationDemo();
+  runIcuAcuitySentinelDemo();
+  runTelehealthTriageRouterDemo();
+  runSubstanceComplianceGuardDemo();
+  runColdChainIotSentinelDemo();
+  runCompoundingAllergyAuditorDemo();
 
-  printBanner('DEMO SEQUENCE COMPLETE — 6 RUNS ACROSS 5 AGENTS');
+  printBanner('DEMO SEQUENCE COMPLETE — 11 RUNS ACROSS 10 AGENTS');
 }
 
 main();
