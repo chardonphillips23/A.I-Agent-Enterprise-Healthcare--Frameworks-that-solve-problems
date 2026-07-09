@@ -67,6 +67,14 @@ The final stage formats an audit event for ingestion into enterprise SIEM platfo
 - **Respiratory COPD Tracker** (`src/hubs/hub6_edge_telemetry/respiratory_copd_tracker.js`) — Runs a 72-hour rolling trend over home pulse-oximeter history and flags `CHRONIC_RESPIRATORY_DISTRESS` only when a full 72-hour window stays continuously below 88% SpO2, booking a preventive home-health telehealth nurse appointment on trigger.
 - **Smart Pillbox Adherence Auditor** (`src/hubs/hub6_edge_telemetry/smart_pillbox_adherence_auditor.js`) — Tracks magnetic lid-opening events on a high-alert medication compartment and flags `CRITICAL_MEDICATION_NON_ADHERENCE` once 48 consecutive hours pass with no opening, triggering a proactive pharmacy telephonic outreach task.
 
+### Hub 7: Dental Practice Management & Maxillofacial Analytics
+
+- **CDT Claim Scrubber** (`src/hubs/hub7_dental_operations/cdt_claim_scrubber.js`) — Flags a `CDT_CODE_CONFLICT` when deep scaling (D4341) and standard prophylaxis (D1110) are billed together on the same quadrant, hard-blocking transmission and routing an itemized correction ticket to the billing desk instead of a scrubbed claim payload.
+- **X-Ray Caries Sentinel** (`src/hubs/hub7_dental_operations/xray_caries_sentinel.js`) — Reads a simulated CV caries-confidence score off bitewing annotation data and, at or above 0.85 confidence, generates an interactive patient-facing case presentation to support informed treatment consent.
+- **Periodontal Bone Loss Auditor** (`src/hubs/hub7_dental_operations/periodontal_bone_loss_auditor.js`) — Cross-checks a requested osseous surgery pre-authorization against charted pocket-depth measurements; if the deepest recorded pocket is under 5mm, flags `INSUFFICIENT_BONE_LOSS_EVIDENCE` and issues a soft-block requesting the hygienist append radiographic measurements.
+- **Teledentistry Triage Router** (`src/hubs/hub7_dental_operations/teledentistry_triage_router.js`) — Scans after-hours patient messages for maxillofacial emergency flags (facial swelling, difficulty swallowing, an avulsed tooth, a suspected jaw fracture); always updates the clinic's emergency whiteboard via webhook, and on a critical match, fires a STAT text to the on-call oral surgeon.
+- **Nitrous Oxide Safety Sentinel** (`src/hubs/hub7_dental_operations/nitrous_oxide_safety_sentinel.js`) — Flags a `HAZARDOUS_NITROUS_LEAK` when ambient N2O exceeds 25ppm continuously for more than 5 minutes, issuing a fail-safe manifold gas-line shutdown command and an urgent facilities evacuation alarm.
+
 ## 📁 Repository Layout & Contribution Standards
 
 ```
@@ -97,12 +105,18 @@ src/
     │   ├── radiology_peer_review_auditor.js
     │   ├── specimen_mismatch_guard.js
     │   └── radiation_safety_dose_sentinel.js
-    └── hub6_edge_telemetry/
-        ├── cardiac_arrhythmia_detector.js
-        ├── diabetic_hypoglycemia_sentinel.js
-        ├── elderly_fall_iot_router.js
-        ├── respiratory_copd_tracker.js
-        └── smart_pillbox_adherence_auditor.js
+    ├── hub6_edge_telemetry/
+    │   ├── cardiac_arrhythmia_detector.js
+    │   ├── diabetic_hypoglycemia_sentinel.js
+    │   ├── elderly_fall_iot_router.js
+    │   ├── respiratory_copd_tracker.js
+    │   └── smart_pillbox_adherence_auditor.js
+    └── hub7_dental_operations/
+        ├── cdt_claim_scrubber.js
+        ├── xray_caries_sentinel.js
+        ├── periodontal_bone_loss_auditor.js
+        ├── teledentistry_triage_router.js
+        └── nitrous_oxide_safety_sentinel.js
 ```
 
 Every agent module lives inside its designated operational hub directory under `src/hubs/` — never as a flat file directly in `src/`. Hub directories group agents by business domain (revenue cycle, clinical operations, and any future hub), keeping the module count per directory legible as the framework grows.
@@ -121,3 +135,4 @@ This framework, as implemented, represents the **code-level architecture layer**
 - **Hub 4 regulatory scope note:** HIPAA governs human PHI and does not apply to animal patient data — the owner/pet-name hashing pattern in Hub 4 is carried over as a data-privacy best practice for consistency, not a HIPAA obligation. Hub 4's actual regulatory surface is different (state veterinary boards, DEA rules for controlled substances in animals, and USDA/APHIS reportable-disease requirements for the livestock biosecurity module) and needs its own compliance review before production use.
 - **Hub 5 regulatory scope note:** the hemorrhage classifier score in `dicom_stroke_triage.js` and the malignancy keyword screen in `critical_biopsy_sentinel.js` are simulated/mocked scoring stand-ins, not real trained models — an actual AI diagnostic aid making triage decisions from imaging or pathology data is regulated as Software as a Medical Device (SaMD) and would need FDA clearance (or equivalent) before clinical use, independent of the data-handling architecture demonstrated here.
 - **Hub 6 regulatory scope note:** consumer wearables, CGMs, smart pillboxes, and fall-detection devices sit outside the hospital's direct control, so a real deployment needs a signed BAA with every device vendor and SMS/telephony provider (Twilio or otherwise) before any real patient data flows through them, plus a review of whether each device's alerting function itself qualifies as a regulated medical device under FDA rules.
+- **Hub 7 regulatory scope note:** the caries-confidence score in `xray_caries_sentinel.js` is a simulated stand-in, not a real trained model, and carries the same SaMD/FDA-clearance caveat as Hub 5's imaging AI. CDT code-conflict rules in `cdt_claim_scrubber.js` are illustrative examples, not a maintained payer coding-edit feed — a real deployment needs to sync against each payer's current CDT/NCCI edit tables rather than a hardcoded pair.

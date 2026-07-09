@@ -25,6 +25,11 @@ const { DiabeticHypoglycemiaSentinel } = require('./hubs/hub6_edge_telemetry/dia
 const { ElderlyFallIotRouter } = require('./hubs/hub6_edge_telemetry/elderly_fall_iot_router');
 const { RespiratoryCopdTracker } = require('./hubs/hub6_edge_telemetry/respiratory_copd_tracker');
 const { SmartPillboxAdherenceAuditor } = require('./hubs/hub6_edge_telemetry/smart_pillbox_adherence_auditor');
+const { CdtClaimScrubber } = require('./hubs/hub7_dental_operations/cdt_claim_scrubber');
+const { XrayCariesSentinel } = require('./hubs/hub7_dental_operations/xray_caries_sentinel');
+const { PeriodontalBoneLossAuditor } = require('./hubs/hub7_dental_operations/periodontal_bone_loss_auditor');
+const { TeledentistryTriageRouter } = require('./hubs/hub7_dental_operations/teledentistry_triage_router');
+const { NitrousOxideSafetySentinel } = require('./hubs/hub7_dental_operations/nitrous_oxide_safety_sentinel');
 
 function printBanner(title) {
   const rule = '='.repeat(70);
@@ -516,6 +521,91 @@ function runSmartPillboxAdherenceAuditorDemo() {
   );
 }
 
+function runCdtClaimScrubberDemo() {
+  printBanner('RUNNING AGENT 26: CDT CLAIM SCRUBBER (Hub 7)');
+  const engine = new CdtClaimScrubber();
+  const rawClaim = {
+    patientName: 'Alan Brooks',
+    patientId: 'PT-55210',
+    primaryCDTCode: 'D4341', // deep scaling
+    secondaryCDTCode: 'D1110', // standard prophylaxis - conflicting pair
+    quadrant: 'UR',
+  };
+
+  printResult('Stage 1 Output (Redacted Claim Record)', engine.ingest(rawClaim));
+  printResult(
+    'Full Run Output (expected: CDT_CODE_CONFLICT, blocked with correction ticket)',
+    engine.run(rawClaim)
+  );
+}
+
+function runXrayCariesSentinelDemo() {
+  printBanner('RUNNING AGENT 27: X-RAY CARIES SENTINEL (Hub 7)');
+  const engine = new XrayCariesSentinel();
+  const rawText = [
+    'Patient Name: Nina Patel',
+    'Patient ID: PT-66312',
+    'Tooth Number: 30',
+    'Caries Confidence Score: 0.92',
+  ].join('\n');
+
+  printResult('Stage 1 Output (Redacted X-Ray Record)', engine.ingest(rawText));
+  printResult(
+    'Full Run Output (expected: HIGH_DECAY_DETECTION, patient case presentation)',
+    engine.run(rawText)
+  );
+}
+
+function runPeriodontalBoneLossAuditorDemo() {
+  printBanner('RUNNING AGENT 28: PERIODONTAL BONE LOSS AUDITOR (Hub 7)');
+  const engine = new PeriodontalBoneLossAuditor();
+  const rawChart = {
+    requestedProcedure: 'osseous_surgery',
+    measurements: [
+      { toothNumber: 14, pocketDepthMillimeters: 3 },
+      { toothNumber: 15, pocketDepthMillimeters: 4 },
+      { toothNumber: 16, pocketDepthMillimeters: 3.5 },
+    ],
+  };
+  const patientIdentifiers = { mrn: 'MRN-DEN-4471', dob: '1985-03-02' };
+
+  printResult('Stage 1 Output (Redacted Charting Record)', engine.ingest(rawChart, patientIdentifiers));
+  printResult(
+    'Full Run Output (expected: INSUFFICIENT_BONE_LOSS_EVIDENCE, pre-auth soft-block)',
+    engine.run(rawChart, patientIdentifiers)
+  );
+}
+
+function runTeledentistryTriageRouterDemo() {
+  printBanner('RUNNING AGENT 29: TELEDENTISTRY TRIAGE ROUTER (Hub 7)');
+  const engine = new TeledentistryTriageRouter();
+  const messageText = "Hi, it's Saturday night and my face is really swollen on the right side near my jaw, it hurts a lot and is getting worse.";
+  const patientIdentifiers = { mrn: 'MRN-DEN-9981', dob: '1995-07-18' };
+  const messagingMetadata = { messageCount: 2 };
+
+  printResult('Stage 1 Output (Redacted Message Record)', engine.ingest(messageText, patientIdentifiers, messagingMetadata));
+  printResult(
+    'Full Run Output (expected: critical priority, STAT oral surgeon page)',
+    engine.run(messageText, patientIdentifiers, messagingMetadata)
+  );
+}
+
+function runNitrousOxideSafetySentinelDemo() {
+  printBanner('RUNNING AGENT 30: NITROUS OXIDE SAFETY SENTINEL (Hub 7)');
+  const engine = new NitrousOxideSafetySentinel();
+  const rawSensorData = {
+    sensorId: 'N2O-SENSOR-OR3',
+    ppmValue: 38, // >25ppm
+    sustainedMinutesAboveThreshold: 7, // >5 minutes
+  };
+
+  printResult('Stage 1 Output (Redacted Sensor Record)', engine.ingest(rawSensorData));
+  printResult(
+    'Full Run Output (expected: HAZARDOUS_NITROUS_LEAK, manifold shutdown + facilities alarm)',
+    engine.run(rawSensorData)
+  );
+}
+
 function main() {
   runClaimsDenialDemo();
   runEdPredictorDemo();
@@ -543,8 +633,13 @@ function main() {
   runElderlyFallIotRouterDemo();
   runRespiratoryCopdTrackerDemo();
   runSmartPillboxAdherenceAuditorDemo();
+  runCdtClaimScrubberDemo();
+  runXrayCariesSentinelDemo();
+  runPeriodontalBoneLossAuditorDemo();
+  runTeledentistryTriageRouterDemo();
+  runNitrousOxideSafetySentinelDemo();
 
-  printBanner('DEMO SEQUENCE COMPLETE — 26 RUNS ACROSS 25 AGENTS');
+  printBanner('DEMO SEQUENCE COMPLETE — 31 RUNS ACROSS 30 AGENTS');
 }
 
 main();
