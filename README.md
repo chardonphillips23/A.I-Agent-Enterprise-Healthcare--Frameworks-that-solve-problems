@@ -51,6 +51,14 @@ The final stage formats an audit event for ingestion into enterprise SIEM platfo
 - **Shelter Intake Quarantine Router** (`src/hubs/hub4_veterinary_operations/shelter_intake_quarantine_router.js`) — Cross-references intake symptoms against a contagious-disease matrix (canine parvovirus, feline leukemia, feline panleukopenia, rabies vector); high-risk matches are hard-routed to isolation housing with a biohazard cleaning ticket, with an explicit guard that refuses to let a positive match reach general-population housing.
 - **Livestock Biosecurity Anomaly Detector** (`src/hubs/hub4_veterinary_operations/livestock_biosecurity_anomaly_detector.js`) — Flags a state-level biosecurity outbreak when 24-hour mortality spikes past 300% or water consumption drops sharply for a sector; on detection, hard-blocks standard transport logging, issues a corporate logistics hold, and formulates the mandatory USDA/State Veterinarian notification report.
 
+### Hub 5: Medical Imaging AI & Pathology Automation
+
+- **DICOM Stroke Triage** (`src/hubs/hub5_imaging_pathology/dicom_stroke_triage.js`) — Reads a simulated pixel-density intracranial hemorrhage classifier score off DICOM header metadata; always emits an HL7 v2 `MDM^T02` document notification, and on a CT study scoring at or above 0.85 confidence, dispatches a STAT neurology pager alert.
+- **Critical Biopsy Sentinel** (`src/hubs/hub5_imaging_pathology/critical_biopsy_sentinel.js`) — Regex-screens pathology findings text against hyper-aggressive malignancy keys (malignant melanoma, high-grade glioblastoma, acute myeloid leukemia, small cell lung carcinoma) and, on a match, formulates an expedited FHIR `ServiceRequest` routed directly to oncology scheduling.
+- **Radiology Peer Review Auditor** (`src/hubs/hub5_imaging_pathology/radiology_peer_review_auditor.js`) — Cross-checks an AI computer-vision diagnostic tag against the human radiologist's impression text; if the AI names a critical finding (e.g. pulmonary embolism) while the human report uses routine negative language, routes the case into the mandatory Senior QA peer review worklist. The audit log carries only a content fingerprint and a numeric variance index — never the report text itself.
+- **Specimen Mismatch Guard** (`src/hubs/hub5_imaging_pathology/specimen_mismatch_guard.js`) — Cross-references a lab specimen barcode's anatomical site against the live EHR surgical booking (e.g. left lung vs. right lung); on conflict, hard-blocks the lab dashboard and sounds an audible cleanroom terminal alarm rather than letting the specimen proceed to processing.
+- **Radiation Safety Dose Sentinel** (`src/hubs/hub5_imaging_pathology/radiation_safety_dose_sentinel.js`) — Converts an incoming CT/X-ray order's DLP (Dose Length Product) to an estimated effective dose and projects it against the patient's cumulative lifetime exposure; at or above the 50 mSv threshold, issues a clinical-decision-support soft-block requiring an active radiologist signature before the scan proceeds.
+
 ## 📁 Repository Layout & Contribution Standards
 
 ```
@@ -69,12 +77,18 @@ src/
     │   ├── substance_compliance_guard.js
     │   ├── cold_chain_iot_sentinel.js
     │   └── compounding_allergy_auditor.js
-    └── hub4_veterinary_operations/
-        ├── companion_toxicosis_sentinel.js
-        ├── equine_telemetry_mews.js
-        ├── avian_exotic_dosage_guard.js
-        ├── shelter_intake_quarantine_router.js
-        └── livestock_biosecurity_anomaly_detector.js
+    ├── hub4_veterinary_operations/
+    │   ├── companion_toxicosis_sentinel.js
+    │   ├── equine_telemetry_mews.js
+    │   ├── avian_exotic_dosage_guard.js
+    │   ├── shelter_intake_quarantine_router.js
+    │   └── livestock_biosecurity_anomaly_detector.js
+    └── hub5_imaging_pathology/
+        ├── dicom_stroke_triage.js
+        ├── critical_biopsy_sentinel.js
+        ├── radiology_peer_review_auditor.js
+        ├── specimen_mismatch_guard.js
+        └── radiation_safety_dose_sentinel.js
 ```
 
 Every agent module lives inside its designated operational hub directory under `src/hubs/` — never as a flat file directly in `src/`. Hub directories group agents by business domain (revenue cycle, clinical operations, and any future hub), keeping the module count per directory legible as the framework grows.
@@ -91,3 +105,4 @@ This framework, as implemented, represents the **code-level architecture layer**
 - **Business Associate Agreements (BAAs):** with every third-party vendor in the data path (RPA platform, SIEM provider, cloud host) before any real PHI flows through these integrations.
 - **Clinical and regulatory validation:** the risk-scoring and policy-matching logic in Hub 2 modules are illustrative rule engines, not clinically validated predictive models — real deployment against real admission/authorization decisions requires clinical review and, depending on use, regulatory clearance.
 - **Hub 4 regulatory scope note:** HIPAA governs human PHI and does not apply to animal patient data — the owner/pet-name hashing pattern in Hub 4 is carried over as a data-privacy best practice for consistency, not a HIPAA obligation. Hub 4's actual regulatory surface is different (state veterinary boards, DEA rules for controlled substances in animals, and USDA/APHIS reportable-disease requirements for the livestock biosecurity module) and needs its own compliance review before production use.
+- **Hub 5 regulatory scope note:** the hemorrhage classifier score in `dicom_stroke_triage.js` and the malignancy keyword screen in `critical_biopsy_sentinel.js` are simulated/mocked scoring stand-ins, not real trained models — an actual AI diagnostic aid making triage decisions from imaging or pathology data is regulated as Software as a Medical Device (SaMD) and would need FDA clearance (or equivalent) before clinical use, independent of the data-handling architecture demonstrated here.

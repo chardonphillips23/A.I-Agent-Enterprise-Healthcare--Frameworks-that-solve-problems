@@ -15,6 +15,11 @@ const { EquineTelemetryMews } = require('./hubs/hub4_veterinary_operations/equin
 const { AvianExoticDosageGuard } = require('./hubs/hub4_veterinary_operations/avian_exotic_dosage_guard');
 const { ShelterIntakeQuarantineRouter } = require('./hubs/hub4_veterinary_operations/shelter_intake_quarantine_router');
 const { LivestockBiosecurityAnomalyDetector } = require('./hubs/hub4_veterinary_operations/livestock_biosecurity_anomaly_detector');
+const { DicomStrokeTriage } = require('./hubs/hub5_imaging_pathology/dicom_stroke_triage');
+const { CriticalBiopsySentinel } = require('./hubs/hub5_imaging_pathology/critical_biopsy_sentinel');
+const { RadiologyPeerReviewAuditor } = require('./hubs/hub5_imaging_pathology/radiology_peer_review_auditor');
+const { SpecimenMismatchGuard } = require('./hubs/hub5_imaging_pathology/specimen_mismatch_guard');
+const { RadiationSafetyDoseSentinel } = require('./hubs/hub5_imaging_pathology/radiation_safety_dose_sentinel');
 
 function printBanner(title) {
   const rule = '='.repeat(70);
@@ -334,6 +339,88 @@ function runLivestockBiosecurityAnomalyDetectorDemo() {
   );
 }
 
+function runDicomStrokeTriageDemo() {
+  printBanner('RUNNING AGENT 16: DICOM STROKE TRIAGE (Hub 5)');
+  const engine = new DicomStrokeTriage();
+  const rawHeaderText = [
+    'Patient Name: Robert Chen',
+    'Patient ID: MRN-882211',
+    'Patient Birth Date: 1965-03-12',
+    'Modality: CT',
+    'Body Part Examined: HEAD',
+    'Scan Protocol: CT Head Without Contrast - Stroke Protocol',
+    'Hemorrhage Confidence Score: 0.91',
+  ].join('\n');
+
+  printResult('Stage 1 Output (Redacted DICOM Record)', engine.ingest(rawHeaderText));
+  printResult(
+    'Full Run Output (expected: CT + confidence >= 0.85, STAT neurology page)',
+    engine.run(rawHeaderText)
+  );
+}
+
+function runCriticalBiopsySentinelDemo() {
+  printBanner('RUNNING AGENT 17: CRITICAL BIOPSY SENTINEL (Hub 5)');
+  const engine = new CriticalBiopsySentinel();
+  const rawText = [
+    'MRN: MRN-334211',
+    'DOB: 1978-11-05',
+    'Accession Number: SP-2026-004471',
+    'Specimen Source: Left forearm skin punch biopsy',
+    'Findings: Sections reveal an asymmetric proliferation of atypical melanocytes consistent with malignant melanoma, Breslow depth 2.1mm.',
+  ].join('\n');
+  const requestHeaders = { authorization: 'Bearer mock-oauth2-bearer-token-abcdef123456' };
+
+  printResult('Stage 1 Output (Pathology Record)', engine.ingest(rawText));
+  printResult(
+    'Full Run Output (expected: malignant melanoma match, expedited oncology ServiceRequest)',
+    engine.run(rawText, requestHeaders)
+  );
+}
+
+function runRadiologyPeerReviewAuditorDemo() {
+  printBanner('RUNNING AGENT 18: RADIOLOGY PEER REVIEW AUDITOR (Hub 5)');
+  const engine = new RadiologyPeerReviewAuditor();
+  const humanReportText = 'Impression: No acute findings. Lungs are clear bilaterally. No acute cardiopulmonary process.';
+  const aiTagText = 'AI_CV_TAG: Pulmonary Embolism (confidence 0.93)';
+  const patientIdentifiers = { mrn: 'MRN-778121', dob: '1982-06-30' };
+
+  printResult('Stage 1 Output (Report Record)', engine.ingest(humanReportText, aiTagText, patientIdentifiers));
+  printResult(
+    'Full Run Output (expected: AI/human discrepancy, Senior QA worklist task)',
+    engine.run(humanReportText, aiTagText, patientIdentifiers)
+  );
+}
+
+function runSpecimenMismatchGuardDemo() {
+  printBanner('RUNNING AGENT 19: SPECIMEN MISMATCH GUARD (Hub 5)');
+  const engine = new SpecimenMismatchGuard();
+  const barcodeData = { specimenId: 'SPEC-99213', anatomicalSite: 'Left Lung', tissueCode: 'LUNG-PARENCHYMA' };
+  const surgicalBooking = { scheduledAnatomicalSite: 'Right Lung', scheduledProcedure: 'Right upper lobectomy' };
+
+  printResult('Stage 1 Output (Barcode + Booking Record)', engine.ingest(barcodeData, surgicalBooking));
+  printResult(
+    'Full Run Output (expected: site mismatch, hard-blocked with cleanroom alarm)',
+    engine.run(barcodeData, surgicalBooking)
+  );
+}
+
+function runRadiationSafetyDoseSentinelDemo() {
+  printBanner('RUNNING AGENT 20: RADIATION SAFETY DOSE SENTINEL (Hub 5)');
+  const engine = new RadiationSafetyDoseSentinel();
+  const radiologyOrder = { modality: 'CT', bodyPartExamined: 'Abdomen', estimatedDlpMgyCm: 600 };
+  // MRN-551122 is seeded in the mock tracking database with 42 mSv prior
+  // cumulative exposure; this scan's ~9 mSv pushes the projected total to
+  // 51 mSv, past the 50 mSv safety threshold.
+  const patientIdentifiers = { mrn: 'MRN-551122', dob: '1970-01-01' };
+
+  printResult('Stage 1 Output (Dose Record + Cumulative Lookup)', engine.ingest(radiologyOrder, patientIdentifiers));
+  printResult(
+    'Full Run Output (expected: overexposure risk, radiologist signature soft-block)',
+    engine.run(radiologyOrder, patientIdentifiers)
+  );
+}
+
 function main() {
   runClaimsDenialDemo();
   runEdPredictorDemo();
@@ -351,8 +438,13 @@ function main() {
   runAvianExoticDosageGuardDemo();
   runShelterIntakeQuarantineRouterDemo();
   runLivestockBiosecurityAnomalyDetectorDemo();
+  runDicomStrokeTriageDemo();
+  runCriticalBiopsySentinelDemo();
+  runRadiologyPeerReviewAuditorDemo();
+  runSpecimenMismatchGuardDemo();
+  runRadiationSafetyDoseSentinelDemo();
 
-  printBanner('DEMO SEQUENCE COMPLETE — 16 RUNS ACROSS 15 AGENTS');
+  printBanner('DEMO SEQUENCE COMPLETE — 21 RUNS ACROSS 20 AGENTS');
 }
 
 main();
