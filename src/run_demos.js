@@ -20,6 +20,11 @@ const { CriticalBiopsySentinel } = require('./hubs/hub5_imaging_pathology/critic
 const { RadiologyPeerReviewAuditor } = require('./hubs/hub5_imaging_pathology/radiology_peer_review_auditor');
 const { SpecimenMismatchGuard } = require('./hubs/hub5_imaging_pathology/specimen_mismatch_guard');
 const { RadiationSafetyDoseSentinel } = require('./hubs/hub5_imaging_pathology/radiation_safety_dose_sentinel');
+const { CardiacArrhythmiaDetector } = require('./hubs/hub6_edge_telemetry/cardiac_arrhythmia_detector');
+const { DiabeticHypoglycemiaSentinel } = require('./hubs/hub6_edge_telemetry/diabetic_hypoglycemia_sentinel');
+const { ElderlyFallIotRouter } = require('./hubs/hub6_edge_telemetry/elderly_fall_iot_router');
+const { RespiratoryCopdTracker } = require('./hubs/hub6_edge_telemetry/respiratory_copd_tracker');
+const { SmartPillboxAdherenceAuditor } = require('./hubs/hub6_edge_telemetry/smart_pillbox_adherence_auditor');
 
 function printBanner(title) {
   const rule = '='.repeat(70);
@@ -421,6 +426,96 @@ function runRadiationSafetyDoseSentinelDemo() {
   );
 }
 
+function runCardiacArrhythmiaDetectorDemo() {
+  printBanner('RUNNING AGENT 21: CARDIAC ARRHYTHMIA DETECTOR (Hub 6)');
+  const engine = new CardiacArrhythmiaDetector();
+  const rawTelemetry = {
+    mrn: 'MRN-661122',
+    dob: '1955-05-20',
+    heartRate: 172, // >160bpm
+    rhythmStatus: 'unstable',
+  };
+
+  printResult('Stage 1 Output (Redacted Telemetry Record)', engine.ingest(rawTelemetry));
+  printResult(
+    'Full Run Output (expected: VENTRICULAR_TACHYCARDIA, cardiologist paged)',
+    engine.run(rawTelemetry)
+  );
+}
+
+function runDiabeticHypoglycemiaSentinelDemo() {
+  printBanner('RUNNING AGENT 22: DIABETIC HYPOGLYCEMIA SENTINEL (Hub 6)');
+  const engine = new DiabeticHypoglycemiaSentinel();
+  const rawText = [
+    'MRN: MRN-772233',
+    'DOB: 1990-02-14',
+    'Caregiver Phone: +1-555-0142',
+    'Current Glucose: 52',
+    'Drop Velocity: 4.5',
+  ].join('\n');
+  const patientIdentifiers = { mrn: 'MRN-772233', dob: '1990-02-14' };
+  const requestHeaders = { authorization: 'Bearer mock-oauth2-bearer-token-abcdef123456' };
+
+  printResult('Stage 1 Output (CGM Record)', engine.ingest(rawText, patientIdentifiers));
+  printResult(
+    'Full Run Output (expected: midnight crash risk, caregiver SMS alert)',
+    engine.run(rawText, patientIdentifiers, requestHeaders)
+  );
+}
+
+function runElderlyFallIotRouterDemo() {
+  printBanner('RUNNING AGENT 23: ELDERLY FALL IOT ROUTER (Hub 6)');
+  const engine = new ElderlyFallIotRouter();
+  const rawAccelerometerData = {
+    deviceId: 'WATCH-88213',
+    gForceValue: 5.1, // >=4.5G
+    noMotionDurationSeconds: 95, // >=60s
+    latitude: 37.7749,
+    longitude: -122.4194,
+  };
+
+  printResult('Stage 1 Output (Redacted Accelerometer Record)', engine.ingest(rawAccelerometerData));
+  printResult(
+    'Full Run Output (expected: ELDERLY_FALL_DETECTED, EMS dispatched)',
+    engine.run(rawAccelerometerData)
+  );
+}
+
+function runRespiratoryCopdTrackerDemo() {
+  printBanner('RUNNING AGENT 24: RESPIRATORY COPD TRACKER (Hub 6)');
+  const engine = new RespiratoryCopdTracker();
+  // 72 hourly readings, all below the 88% threshold (84-87 range).
+  const historicalSpO2 = Array.from({ length: 72 }, (_, i) => 84 + (i % 4));
+  const rawHistory = { mrn: 'MRN-990044', dob: '1948-08-15', historicalSpO2 };
+
+  printResult('Stage 1 Output (Redacted Oximeter History Record)', engine.ingest(rawHistory));
+  printResult(
+    'Full Run Output (expected: CHRONIC_RESPIRATORY_DISTRESS, telehealth booking)',
+    engine.run(rawHistory)
+  );
+}
+
+function runSmartPillboxAdherenceAuditorDemo() {
+  printBanner('RUNNING AGENT 25: SMART PILLBOX ADHERENCE AUDITOR (Hub 6)');
+  const engine = new SmartPillboxAdherenceAuditor();
+  const now = Date.now();
+  const rawPillboxData = {
+    compartmentLabel: 'COMPARTMENT_3_EVENING_DOSE',
+    openEventTimestamps: [
+      new Date(now - 96 * 60 * 60 * 1000).toISOString(),
+      new Date(now - 74 * 60 * 60 * 1000).toISOString(),
+      new Date(now - 50 * 60 * 60 * 1000).toISOString(), // most recent open: 50h ago
+    ],
+  };
+  const patientIdentifiers = { mrn: 'MRN-113355', dob: '1952-12-01' };
+
+  printResult('Stage 1 Output (Redacted Pillbox Record)', engine.ingest(rawPillboxData, patientIdentifiers));
+  printResult(
+    'Full Run Output (expected: CRITICAL_MEDICATION_NON_ADHERENCE, pharmacy outreach)',
+    engine.run(rawPillboxData, patientIdentifiers)
+  );
+}
+
 function main() {
   runClaimsDenialDemo();
   runEdPredictorDemo();
@@ -443,8 +538,13 @@ function main() {
   runRadiologyPeerReviewAuditorDemo();
   runSpecimenMismatchGuardDemo();
   runRadiationSafetyDoseSentinelDemo();
+  runCardiacArrhythmiaDetectorDemo();
+  runDiabeticHypoglycemiaSentinelDemo();
+  runElderlyFallIotRouterDemo();
+  runRespiratoryCopdTrackerDemo();
+  runSmartPillboxAdherenceAuditorDemo();
 
-  printBanner('DEMO SEQUENCE COMPLETE — 21 RUNS ACROSS 20 AGENTS');
+  printBanner('DEMO SEQUENCE COMPLETE — 26 RUNS ACROSS 25 AGENTS');
 }
 
 main();

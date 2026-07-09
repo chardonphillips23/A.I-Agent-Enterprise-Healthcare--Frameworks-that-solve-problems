@@ -59,6 +59,14 @@ The final stage formats an audit event for ingestion into enterprise SIEM platfo
 - **Specimen Mismatch Guard** (`src/hubs/hub5_imaging_pathology/specimen_mismatch_guard.js`) — Cross-references a lab specimen barcode's anatomical site against the live EHR surgical booking (e.g. left lung vs. right lung); on conflict, hard-blocks the lab dashboard and sounds an audible cleanroom terminal alarm rather than letting the specimen proceed to processing.
 - **Radiation Safety Dose Sentinel** (`src/hubs/hub5_imaging_pathology/radiation_safety_dose_sentinel.js`) — Converts an incoming CT/X-ray order's DLP (Dose Length Product) to an estimated effective dose and projects it against the patient's cumulative lifetime exposure; at or above the 50 mSv threshold, issues a clinical-decision-support soft-block requiring an active radiologist signature before the scan proceeds.
 
+### Hub 6: Remote Patient Monitoring & Edge Telemetry
+
+- **Cardiac Arrhythmia Detector** (`src/hubs/hub6_edge_telemetry/cardiac_arrhythmia_detector.js`) — Flags a `VENTRICULAR_TACHYCARDIA` telemetry status from wearable heart-rate streaming when heart rate exceeds 160bpm on an unstable rhythm; always emits an HL7 v2 `ORU^R01` cardiology alert, and on critical risk, dispatches an emergency cardiologist page.
+- **Diabetic Hypoglycemia Sentinel** (`src/hubs/hub6_edge_telemetry/diabetic_hypoglycemia_sentinel.js`) — Screens CGM sensor readings for a `HYPOGLYCEMIC_CRASH_RISK` (glucose under 60 mg/dL or a drop velocity over 3 mg/dL/min) and, on a crash, fires an urgent Twilio SMS alert to the patient's listed caregiver.
+- **Elderly Fall IoT Router** (`src/hubs/hub6_edge_telemetry/elderly_fall_iot_router.js`) — Detects an `ELDERLY_FALL_DETECTED` event from smart-watch accelerometer data (impact ≥4.5G followed by ≥60 seconds of stillness) and dispatches an EMS ticket carrying exact coordinates; the SIEM audit log instead carries coordinates rounded to ~11km precision, never the raw address-level location.
+- **Respiratory COPD Tracker** (`src/hubs/hub6_edge_telemetry/respiratory_copd_tracker.js`) — Runs a 72-hour rolling trend over home pulse-oximeter history and flags `CHRONIC_RESPIRATORY_DISTRESS` only when a full 72-hour window stays continuously below 88% SpO2, booking a preventive home-health telehealth nurse appointment on trigger.
+- **Smart Pillbox Adherence Auditor** (`src/hubs/hub6_edge_telemetry/smart_pillbox_adherence_auditor.js`) — Tracks magnetic lid-opening events on a high-alert medication compartment and flags `CRITICAL_MEDICATION_NON_ADHERENCE` once 48 consecutive hours pass with no opening, triggering a proactive pharmacy telephonic outreach task.
+
 ## 📁 Repository Layout & Contribution Standards
 
 ```
@@ -83,12 +91,18 @@ src/
     │   ├── avian_exotic_dosage_guard.js
     │   ├── shelter_intake_quarantine_router.js
     │   └── livestock_biosecurity_anomaly_detector.js
-    └── hub5_imaging_pathology/
-        ├── dicom_stroke_triage.js
-        ├── critical_biopsy_sentinel.js
-        ├── radiology_peer_review_auditor.js
-        ├── specimen_mismatch_guard.js
-        └── radiation_safety_dose_sentinel.js
+    ├── hub5_imaging_pathology/
+    │   ├── dicom_stroke_triage.js
+    │   ├── critical_biopsy_sentinel.js
+    │   ├── radiology_peer_review_auditor.js
+    │   ├── specimen_mismatch_guard.js
+    │   └── radiation_safety_dose_sentinel.js
+    └── hub6_edge_telemetry/
+        ├── cardiac_arrhythmia_detector.js
+        ├── diabetic_hypoglycemia_sentinel.js
+        ├── elderly_fall_iot_router.js
+        ├── respiratory_copd_tracker.js
+        └── smart_pillbox_adherence_auditor.js
 ```
 
 Every agent module lives inside its designated operational hub directory under `src/hubs/` — never as a flat file directly in `src/`. Hub directories group agents by business domain (revenue cycle, clinical operations, and any future hub), keeping the module count per directory legible as the framework grows.
@@ -106,3 +120,4 @@ This framework, as implemented, represents the **code-level architecture layer**
 - **Clinical and regulatory validation:** the risk-scoring and policy-matching logic in Hub 2 modules are illustrative rule engines, not clinically validated predictive models — real deployment against real admission/authorization decisions requires clinical review and, depending on use, regulatory clearance.
 - **Hub 4 regulatory scope note:** HIPAA governs human PHI and does not apply to animal patient data — the owner/pet-name hashing pattern in Hub 4 is carried over as a data-privacy best practice for consistency, not a HIPAA obligation. Hub 4's actual regulatory surface is different (state veterinary boards, DEA rules for controlled substances in animals, and USDA/APHIS reportable-disease requirements for the livestock biosecurity module) and needs its own compliance review before production use.
 - **Hub 5 regulatory scope note:** the hemorrhage classifier score in `dicom_stroke_triage.js` and the malignancy keyword screen in `critical_biopsy_sentinel.js` are simulated/mocked scoring stand-ins, not real trained models — an actual AI diagnostic aid making triage decisions from imaging or pathology data is regulated as Software as a Medical Device (SaMD) and would need FDA clearance (or equivalent) before clinical use, independent of the data-handling architecture demonstrated here.
+- **Hub 6 regulatory scope note:** consumer wearables, CGMs, smart pillboxes, and fall-detection devices sit outside the hospital's direct control, so a real deployment needs a signed BAA with every device vendor and SMS/telephony provider (Twilio or otherwise) before any real patient data flows through them, plus a review of whether each device's alerting function itself qualifies as a regulated medical device under FDA rules.
